@@ -41,6 +41,7 @@ class conv_block(nn.Module):
     def forward(self, x):
         return self.relu(self.batchnorm(self.conv(x)))
 
+
 class Inception_block(nn.Module):
     def __init__(self, in_channels, out_1x1, red_3x3, out_3x3, red_5x5, out_5x5, out_1x1pool): # all these are filters
         # output of the 1x1 conv 
@@ -78,9 +79,32 @@ class Inception_block(nn.Module):
         return torch.cat([self.branch1(x), self.branch2(x), self.branch3(x), self.branch4(x)], dim=1) # along the 1st dim 
 
 
+class InceptionAux(nn.Module): # aux block
+    def __init__(self, in_channels, num_classes):
+        super(InceptionAux, self).__init__()
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=0.7)
+        self.pool = nn.AvgPool2d(kernel_size=5, stride=3)
+        self.conv = conv_block(in_channels, 128, kernel_size=1)
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, num_classes)
+    
+    def forward(self, x):
+        x = self.pool(x)
+        x = self.conv(x)
+        x = x.reshape(x.shape[0], -1)
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+
 class GoogLeNet(nn.Module):
-    def __init__(self, in_channels=3, num_classes = 1000):
+    def __init__(self, in_channels=3, aux_logits=True, num_classes = 1000):
         super(GoogLeNet, self).__init__()
+        assert aux_logits == True or aux_logits == False
+
+        self.aux_logits = aux_logits
 
         ## Block:1 
         self.conv1 = conv_block(in_channels=in_channels, out_channels=64, 
@@ -111,6 +135,13 @@ class GoogLeNet(nn.Module):
         self.dropout = nn.Dropout(p=0.4)
         self.fc1 = nn.Linear(in_features=1024, out_features=1000)
 
+        # if we need aux logits
+        if self.aux_logits:
+            self.aux1 = InceptionAux(512, num_classes)
+            self.aux2 = InceptionAux(528, num_classes)
+        else:
+            self.aux1 = self.aux2 = None
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.maxpool1(x)
@@ -124,12 +155,16 @@ class GoogLeNet(nn.Module):
         x = self.inception4a(x)
 
         # <Auxilary output>
+        if self.aux_logits and self.training:
+            aux1 = self.aux1(x)
 
         x = self.inception4b(x)
         x = self.inception4c(x)
         x = self.inception4d(x)
 
         # <Auxilary output>
+        if self.aux_logits and self.training:
+            aux2 = self.aux2(x)
 
         x = self.inception4e(x)
         x = self.maxpool4(x)
@@ -141,7 +176,11 @@ class GoogLeNet(nn.Module):
         x = self.dropout(x)        
         x = self.fc1(x)
 
-        return x
+        if self.aux_logits and self.training:
+            return aux1, aux2, x
+        else:
+            return x
+        
 """
 # Architecture -- we also use Batchnorm here
 
@@ -171,4 +210,6 @@ softmax
 if __name__ == "__main__":
     x = torch.randn(3, 3, 224, 224) # 3 images, 3 channels, h, w
     model = GoogLeNet()
-    print(model(x).shape) # should output 3x1000
+    # print(model(x).shape) # should output 3x1000
+    print(len(model(x)))
+    print(f"\n {model(x)}")
