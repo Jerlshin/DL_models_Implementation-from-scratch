@@ -3,12 +3,18 @@ import torch.nn as nn
 
 # self-attention 
 class SelfAttention(nn.Module):
-    def __init__(self, embed_size, heads):
+    def __init__(self, embed_size, heads): 
+        '''
+        embed_size : dim of the input embedding
+        heads : no of attention heads in multi head attention
+        '''
+        # each word/token will be represented as  "embed_size" dim vector
         super(SelfAttention, self).__init__()
         # d_k - dimension, embed_size
         self.embed_size = embed_size
         self.heads = heads
-        self.head_dim = embed_size // heads
+        self.head_dim = embed_size // heads # dim of each individual attention head
+
 
         # embed_size = heads * head_dim
         assert (self.head_dim * heads == embed_size) # embed size needs to be divisible by heads
@@ -64,7 +70,7 @@ class SelfAttention(nn.Module):
         out = self.fc_out(out)
 
         return out
-
+# multiple attention heads to enable the model to attend to difference aspects of the input data simultaneously.
 '''Sinusoidal Positional Encoding -- used in the paper mam'''
 
 import numpy as np
@@ -342,3 +348,11 @@ def positional_encoding(max_length, embed_size):
 '''
 
 # we just want to change this to include sinusoidal encoding
+
+# Queries represent the elements in the input seq for which we want to calculate the attention. each query corresponds to a specific position or element in the output sequence.
+# Queries represent the positions in th target seq where you want to predict the next word or token
+
+# Keys represent the elements in the input seq that help the model determine the importance of each query. provide context for generating the attention scores
+# Values contain information from the input seq that will be used to generate the output seq. 
+# values are used to compute the weighted sum that forms the output fo the self-attention mechanism
+'''These are calculate by the linear transformation to the input embedding. '''
